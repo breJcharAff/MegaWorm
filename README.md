@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 2. Lancer MegaWorm
 ```shell
-python src/main.py
+python -m src.main
 ```
 
 ----

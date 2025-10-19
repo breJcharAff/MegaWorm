@@ -1,0 +1,15 @@
+{
+  "game_name": "Megaworm",
+  "grid": {
+      "nb_row": 25,
+      "nb_col": 25,
+      "cell_width": 28,
+      "margin": 2
+  },
+  "snakes": {
+      "scaling": 0.24
+  },
+  "orbs": {
+      "scaling": 0.06
+  }
+}
