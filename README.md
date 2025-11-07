@@ -71,7 +71,7 @@ python -m src.main
 
 ---
 
-![Modélisation de MegaWorm](src/images/documentation/modelisation.png)
+![Modélisation de MegaWorm](src/resources/images/documentation/modelisation.png)
 
 ---
 
