@@ -11,7 +11,7 @@ def game_conf():
 
 @pytest.fixture()
 def an_empty_world(game_conf):
-    return World(xmax=game_conf['grid']['nb_row'], ymax=game_conf['grid']['nb_col'])
+    return World(nb_col=game_conf['grid']['nb_row'], nb_row=game_conf['grid']['nb_col'])
 
 @pytest.fixture()
 def a_world_with_one_snake(an_empty_world):

@@ -7,33 +7,34 @@ from src.engine.World import get_n_consecutive_empty_cells_from_grid, get_empty_
 def test_create_snakes(an_empty_world):
     an_empty_world.create_snakes(quantity=3)
     assert len(an_empty_world.snakes) == 3
-    assert isinstance(an_empty_world.snakes[0], Snake)
-    assert an_empty_world.snakes[0].positions == []
+    assert isinstance(next(iter(an_empty_world.snakes.values())), Snake)
+    assert next(iter(an_empty_world.snakes.values())).positions == []
 
 def test_create_orbs(an_empty_world):
     number_of_orbs = 15
     an_empty_world.create_orbs(quantity=number_of_orbs)
     assert len(an_empty_world.orbs) == number_of_orbs
-    assert isinstance(an_empty_world.orbs[0], Orb)
-    assert an_empty_world.orbs[0].x is None
-    assert an_empty_world.orbs[0].y is None
+    first_orb = an_empty_world.orbs[0]
+    assert isinstance(first_orb, Orb)
+    assert first_orb.x is None
+    assert first_orb.y is None
 
 def test_spawn_snakes(a_world_with_one_snake):
     a_world_with_one_snake.spawn_snakes()
-    snake = a_world_with_one_snake.snakes[0]
+    snake = next(iter(a_world_with_one_snake.snakes.values()))
     assert len(snake.positions) == snake.length
-    assert isinstance(snake.positions[0], dict)
+    assert isinstance(snake.positions, list)
     assert 'x' in snake.positions[0]
     assert 'y' in snake.positions[0]
     assert isinstance(snake.positions[0]['x'], int)
     assert isinstance(snake.positions[0]['y'], int)
-    assert 0 <= snake.positions[0]['x'] <= a_world_with_one_snake.xmax
-    assert 0 <= snake.positions[0]['y'] <= a_world_with_one_snake.ymax
+    assert 0 <= snake.positions[0]['x'] <= a_world_with_one_snake.nb_col
+    assert 0 <= snake.positions[0]['y'] <= a_world_with_one_snake.nb_row
 
 def test_spawn_ten_snakes(a_world_with_five_snakes):
     nb_empty_cells_before = len(a_world_with_five_snakes.get_map_empty_cells())
     a_world_with_five_snakes.spawn_snakes()
-    nb_cells_with_snakes = sum([snake.length for snake in a_world_with_five_snakes.snakes])
+    nb_cells_with_snakes = sum([snake.length for snake in a_world_with_five_snakes.snakes.values()])
     nb_empty_cells_after = len(a_world_with_five_snakes.get_map_empty_cells())
     assert nb_empty_cells_before == nb_empty_cells_after + nb_cells_with_snakes
 
@@ -46,22 +47,22 @@ def test_spawn_orbs(a_world_with_10_orbs):
     assert nb_empty_cells_before - nb_empty_cells_after == 10
 
 def test_get_map_empty_cells(a_world_with_one_snake_ten_orbs):
-    total_cells = a_world_with_one_snake_ten_orbs.xmax * a_world_with_one_snake_ten_orbs.ymax
-    cells_not_empty = 10 + a_world_with_one_snake_ten_orbs.snakes[0].length
+    total_cells = a_world_with_one_snake_ten_orbs.nb_col * a_world_with_one_snake_ten_orbs.nb_row
+    cells_not_empty = 10 + next(iter(a_world_with_one_snake_ten_orbs.snakes.values())).length
     a_world_with_one_snake_ten_orbs.spawn_orbs()
     a_world_with_one_snake_ten_orbs.spawn_snakes()
     empty_cells = a_world_with_one_snake_ten_orbs.get_map_empty_cells()
     assert len(empty_cells) == total_cells - cells_not_empty
 
 def test_update_map(a_world_with_one_snake_ten_orbs):
-    total_cells = a_world_with_one_snake_ten_orbs.xmax * a_world_with_one_snake_ten_orbs.ymax
+    total_cells = a_world_with_one_snake_ten_orbs.nb_col * a_world_with_one_snake_ten_orbs.nb_row
     assert len(a_world_with_one_snake_ten_orbs.get_map_empty_cells()) == total_cells
     a_world_with_one_snake_ten_orbs.spawn_orbs()
     a_world_with_one_snake_ten_orbs.spawn_snakes()
-    cells_not_empty = 10 + a_world_with_one_snake_ten_orbs.snakes[0].length
+    cells_not_empty = 10 + next(iter(a_world_with_one_snake_ten_orbs.snakes.values())).length
     assert len(a_world_with_one_snake_ten_orbs.get_map_empty_cells()) == total_cells - cells_not_empty
 
-@pytest.mark.parametrize('xmax, ymax, expected', [
+@pytest.mark.parametrize('nb_col, nb_row, expected', [
     (0, 0, {}),
     (0, 1, {}),
     (1, 1, {(0,0): 0}),
@@ -74,8 +75,8 @@ def test_update_map(a_world_with_one_snake_ten_orbs):
             (0,4): 0, (1,4): 0, (2,4): 0, (3,4): 0,
             (0,5): 0, (1,5): 0, (2,5): 0, (3,5): 0})
 ])
-def test_get_empty_map(xmax, ymax, expected):
-    assert get_empty_map(xmax=xmax, ymax=ymax) == expected
+def test_get_empty_map(nb_col, nb_row, expected):
+    assert get_empty_map(nb_col=nb_col, nb_row=nb_row) == expected
 
 @pytest.mark.parametrize('n, empty_value, nb_cols, nb_rows, grid, expected', [
 
