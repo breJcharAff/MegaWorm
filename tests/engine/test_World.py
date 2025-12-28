@@ -1,79 +1,59 @@
+import copy
+
 import pytest
+
+from src.utils import conf
 from src.engine.Orb import Orb
-from src.engine.Snake import Snake
-from src.engine.World import get_n_consecutive_empty_cells_from_grid, get_empty_map
+from src.engine.Snake import Snake, Direction
+from src.engine.World import get_n_consecutive_empty_cells_from_grid, get_empty_map, World, CellType
 
 
 def test_create_snakes(an_empty_world):
     an_empty_world.create_snakes(quantity=3)
     assert len(an_empty_world.snakes) == 3
     assert isinstance(next(iter(an_empty_world.snakes.values())), Snake)
-    assert next(iter(an_empty_world.snakes.values())).positions == []
-
-def test_create_orbs(an_empty_world):
-    number_of_orbs = 15
-    an_empty_world.create_orbs(quantity=number_of_orbs)
-    assert len(an_empty_world.orbs) == number_of_orbs
-    first_orb = an_empty_world.orbs[0]
-    assert isinstance(first_orb, Orb)
-    assert first_orb.x is None
-    assert first_orb.y is None
-
-def test_spawn_snakes(a_world_with_one_snake):
-    a_world_with_one_snake.spawn_snakes()
-    snake = next(iter(a_world_with_one_snake.snakes.values()))
+    snake = next(iter(an_empty_world.snakes.values()))
     assert len(snake.positions) == snake.length
     assert isinstance(snake.positions, list)
     assert 'x' in snake.positions[0]
     assert 'y' in snake.positions[0]
     assert isinstance(snake.positions[0]['x'], int)
     assert isinstance(snake.positions[0]['y'], int)
-    assert 0 <= snake.positions[0]['x'] <= a_world_with_one_snake.nb_col
-    assert 0 <= snake.positions[0]['y'] <= a_world_with_one_snake.nb_row
+    assert 0 <= snake.positions[0]['x'] <= an_empty_world.nb_col
+    assert 0 <= snake.positions[0]['y'] <= an_empty_world.nb_row
 
-def test_spawn_ten_snakes(a_world_with_five_snakes):
-    nb_empty_cells_before = len(a_world_with_five_snakes.get_map_empty_cells())
-    a_world_with_five_snakes.spawn_snakes()
-    nb_cells_with_snakes = sum([snake.length for snake in a_world_with_five_snakes.snakes.values()])
-    nb_empty_cells_after = len(a_world_with_five_snakes.get_map_empty_cells())
-    assert nb_empty_cells_before == nb_empty_cells_after + nb_cells_with_snakes
+def test_create_orbs(an_empty_world):
+    number_of_orbs = 15
+    an_empty_world.create_orbs(quantity=number_of_orbs)
+    assert len(an_empty_world.orbs) == number_of_orbs
+    first_orb = next(iter(an_empty_world.orbs.values()))
+    assert isinstance(first_orb, Orb)
+    assert isinstance(first_orb.x, int)
+    assert isinstance(first_orb.y, int)
 
-def test_spawn_orbs(a_world_with_10_orbs):
-    nb_empty_cells_before = len(a_world_with_10_orbs.get_map_empty_cells())
-    a_world_with_10_orbs.spawn_orbs()
-    nb_empty_cells_after = len(a_world_with_10_orbs.get_map_empty_cells())
-    assert isinstance(a_world_with_10_orbs.orbs[0].x, int)
-    assert isinstance(a_world_with_10_orbs.orbs[0].y, int)
-    assert nb_empty_cells_before - nb_empty_cells_after == 10
+def test_get_map_empty_cells(an_empty_world):
+    number_of_orbs = 15
+    number_of_snakes = 3
+    nb_empty_cells_before = len(an_empty_world.get_map_empty_cells())
 
-def test_get_map_empty_cells(a_world_with_one_snake_ten_orbs):
-    total_cells = a_world_with_one_snake_ten_orbs.nb_col * a_world_with_one_snake_ten_orbs.nb_row
-    cells_not_empty = 10 + next(iter(a_world_with_one_snake_ten_orbs.snakes.values())).length
-    a_world_with_one_snake_ten_orbs.spawn_orbs()
-    a_world_with_one_snake_ten_orbs.spawn_snakes()
-    empty_cells = a_world_with_one_snake_ten_orbs.get_map_empty_cells()
-    assert len(empty_cells) == total_cells - cells_not_empty
+    an_empty_world.create_orbs(quantity=number_of_orbs)
+    an_empty_world.create_snakes(quantity=number_of_snakes)
 
-def test_update_map(a_world_with_one_snake_ten_orbs):
-    total_cells = a_world_with_one_snake_ten_orbs.nb_col * a_world_with_one_snake_ten_orbs.nb_row
-    assert len(a_world_with_one_snake_ten_orbs.get_map_empty_cells()) == total_cells
-    a_world_with_one_snake_ten_orbs.spawn_orbs()
-    a_world_with_one_snake_ten_orbs.spawn_snakes()
-    cells_not_empty = 10 + next(iter(a_world_with_one_snake_ten_orbs.snakes.values())).length
-    assert len(a_world_with_one_snake_ten_orbs.get_map_empty_cells()) == total_cells - cells_not_empty
+    nb_empty_cells_after = len(an_empty_world.get_map_empty_cells())
+    assert nb_empty_cells_before - nb_empty_cells_after == (number_of_orbs + number_of_snakes * conf['snakes']['length_initial'])
 
 @pytest.mark.parametrize('nb_col, nb_row, expected', [
     (0, 0, {}),
     (0, 1, {}),
-    (1, 1, {(0,0): 0}),
-    (1, 2, {(0,0): 0,
-            (0,1): 0}),
-    (4, 6, {(0,0): 0, (1,0): 0, (2,0): 0, (3,0): 0,
-            (0,1): 0, (1,1): 0, (2,1): 0, (3,1): 0,
-            (0,2): 0, (1,2): 0, (2,2): 0, (3,2): 0,
-            (0,3): 0, (1,3): 0, (2,3): 0, (3,3): 0,
-            (0,4): 0, (1,4): 0, (2,4): 0, (3,4): 0,
-            (0,5): 0, (1,5): 0, (2,5): 0, (3,5): 0})
+    (1, 1, {(0,0): CellType.EMPTY}),
+    (1, 2, {(0,0): CellType.EMPTY,
+            (0,1): CellType.EMPTY}),
+    (4, 6, {(0,0): CellType.EMPTY, (1,0): CellType.EMPTY, (2,0): CellType.EMPTY, (3,0): CellType.EMPTY,
+            (0,1): CellType.EMPTY, (1,1): CellType.EMPTY, (2,1): CellType.EMPTY, (3,1): CellType.EMPTY,
+            (0,2): CellType.EMPTY, (1,2): CellType.EMPTY, (2,2): CellType.EMPTY, (3,2): CellType.EMPTY,
+            (0,3): CellType.EMPTY, (1,3): CellType.EMPTY, (2,3): CellType.EMPTY, (3,3): CellType.EMPTY,
+            (0,4): CellType.EMPTY, (1,4): CellType.EMPTY, (2,4): CellType.EMPTY, (3,4): CellType.EMPTY,
+            (0,5): CellType.EMPTY, (1,5): CellType.EMPTY, (2,5): CellType.EMPTY, (3,5): CellType.EMPTY})
 ])
 def test_get_empty_map(nb_col, nb_row, expected):
     assert get_empty_map(nb_col=nb_col, nb_row=nb_row) == expected
@@ -140,5 +120,54 @@ def test_get_empty_map(nb_col, nb_row, expected):
         ]
     )
 ])
-def test_get_n_consecutive_empty_cells_from_two_dimensional_list(n, empty_value, nb_cols, nb_rows, grid, expected):
+def test_get_n_consecutive_empty_cells_from_grid(n, empty_value, nb_cols, nb_rows, grid, expected):
     assert get_n_consecutive_empty_cells_from_grid(n=n, grid=grid, empty_value=empty_value, nb_cols=nb_cols, nb_rows=nb_rows) == expected
+
+@pytest.mark.parametrize('snake_positions, orbs_positions, map_before, map_after', [
+    (
+        [{'x':0,'y':0}, {'x':1,'y':0}, {'x':2,'y':0},],
+        [(0,1), (0,2), (0,3), (0,4)],
+
+        {(0,0): CellType.EMPTY, (1,0): CellType.EMPTY, (2,0): CellType.EMPTY, (3,0): CellType.EMPTY,
+         (0,1): CellType.EMPTY, (1,1): CellType.EMPTY, (2,1): CellType.EMPTY, (3,1): CellType.EMPTY,
+         (0,2): CellType.EMPTY, (1,2): CellType.EMPTY, (2,2): CellType.EMPTY, (3,2): CellType.EMPTY,
+         (0,3): CellType.EMPTY, (1,3): CellType.EMPTY, (2,3): CellType.EMPTY, (3,3): CellType.EMPTY,
+         (0,4): CellType.EMPTY, (1,4): CellType.EMPTY, (2,4): CellType.EMPTY, (3,4): CellType.EMPTY,
+         (0,5): CellType.EMPTY, (1,5): CellType.EMPTY, (2,5): CellType.EMPTY, (3,5): CellType.EMPTY},
+
+        {(0, 0): CellType.SNAKE, (1, 0): CellType.SNAKE, (2, 0): CellType.SNAKE, (3, 0): CellType.EMPTY,
+         (0, 1): CellType.ORB,   (1, 1): CellType.EMPTY, (2, 1): CellType.EMPTY, (3, 1): CellType.EMPTY,
+         (0, 2): CellType.ORB,   (1, 2): CellType.EMPTY, (2, 2): CellType.EMPTY, (3, 2): CellType.EMPTY,
+         (0, 3): CellType.ORB,   (1, 3): CellType.EMPTY, (2, 3): CellType.EMPTY, (3, 3): CellType.EMPTY,
+         (0, 4): CellType.ORB,   (1, 4): CellType.EMPTY, (2, 4): CellType.EMPTY, (3, 4): CellType.EMPTY,
+         (0, 5): CellType.EMPTY, (1, 5): CellType.EMPTY, (2, 5): CellType.EMPTY, (3, 5): CellType.EMPTY}
+    )
+])
+def test_update_map_state(snake_positions, orbs_positions, map_before, map_after):
+    world = World(nb_col=4, nb_row=6)
+    world.map = copy.deepcopy(map_before)
+    snake = Snake(length=3, speed=1)
+    snake.positions = snake_positions
+    world.snakes[1] = snake
+    for i, position in enumerate(orbs_positions):
+        orb = Orb()
+        orb.x, orb.y = position
+        world.orbs[i] = orb
+    assert world.map == map_before
+    world.update_map_state()
+    assert world.map == map_after
+
+def test_get_snake_player():
+    world = World(nb_col=24, nb_row=24)
+    world.create_snakes(quantity=5, first_is_a_player=True)
+    first_snake = next(iter(world.snakes.values()))
+    assert world.get_snake_player() == first_snake
+
+def test_set_player_direction():
+    world = World(nb_col=4, nb_row=6)
+    world.create_snakes(quantity=2, first_is_a_player=True)
+    player = next(iter(world.snakes.values()))
+    player.direction = Direction.DOWN
+    success = world.set_player_direction(direction=Direction.LEFT)
+    assert success
+    assert player.direction == Direction.LEFT

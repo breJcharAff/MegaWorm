@@ -1,15 +1,24 @@
 {
-  "game_name": "Megaworm",
-  "grid": {
-      "nb_row": 25,
-      "nb_col": 25,
-      "cell_width": 28,
-      "margin": 2
-  },
-  "snakes": {
-      "scaling": 0.24
-  },
-  "orbs": {
-      "scaling": 0.06
-  }
+    "game_name": "Megaworm",
+    "refresh_time": 0.1,
+    "log_file": "megaworm.log",
+    "grid": {
+        "nb_row": 25,
+        "nb_col": 25,
+        "cell_width": 28,
+        "cell_height": 28,
+        "margin": 2
+    },
+    "empty": {
+        "color": [0, 0, 0, 255]
+    },
+    "snakes": {
+        "scaling": 0.24,
+        "length_initial": 3,
+        "color": [0, 255, 0, 255]
+    },
+    "orbs": {
+        "scaling": 0.06,
+        "color": [255, 0, 0, 255]
+    }
 }
