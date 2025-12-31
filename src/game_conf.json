@@ -2,6 +2,13 @@
     "game_name": "Megaworm",
     "refresh_time": 0.1,
     "log_file": "megaworm.log",
+    "views": {
+        "menu": {
+            "width": 800,
+            "height": 600,
+            "background_color": [0, 0, 0, 255]
+        }
+    },
     "grid": {
         "nb_row": 25,
         "nb_col": 25,

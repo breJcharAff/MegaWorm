@@ -2,8 +2,7 @@ import argparse
 
 import arcade
 
-from src.engine.World import World
-from src.ui.arcade_view import MapWindow
+from src.ui.game_window import GameWindow
 from src.utils import conf, setup_logging
 
 
@@ -11,12 +10,7 @@ def main(debug_level: int) -> None:
 
     setup_logging(level=debug_level)
 
-    world = World(nb_col=conf['grid']['nb_col'], nb_row=conf['grid']['nb_row'])
-    world.create_orbs(quantity=30)
-    world.create_snakes(quantity=3, first_is_a_player=True)
-
-    window = MapWindow(world=world, debug_level=debug_level)
-    window.setup()
+    _window = GameWindow()
     arcade.run()
 
 if __name__ == '__main__':

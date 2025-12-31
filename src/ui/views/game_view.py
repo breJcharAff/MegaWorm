@@ -8,7 +8,6 @@ from src.engine.Snake import Direction
 from src.engine.World import World, CellType
 from src.utils import conf
 
-WINDOW_TITLE = conf['game_name']
 # Window size depends on grid dimension
 WINDOW_WIDTH = (conf['grid']['cell_width'] + conf['grid']['margin']) * conf['grid']['nb_col'] + conf['grid']['margin']
 WINDOW_HEIGHT = (conf['grid']['cell_height'] + conf['grid']['margin']) * conf['grid']['nb_row'] + conf['grid']['margin']
@@ -21,12 +20,15 @@ class CellColor(Enum):
     SNAKE = conf['snakes']['color']
 
 
-class MapWindow(arcade.Window):
+class GameView(arcade.View):
 
-    def __init__(self, world: World, visible: bool = True, debug_level: int = 0):
+    def __init__(self, world: World, debug_level: int = 0):
 
-        logger.debug(f'[{os.path.basename(__file__)}] - Initializing Arcade Window')
-        super().__init__(width=WINDOW_WIDTH, height=WINDOW_HEIGHT, title=WINDOW_TITLE, center_window=True, visible=visible)
+        logger.debug(f'[{os.path.basename(__file__)}] - Initializing GameView')
+        super().__init__()
+        self.window.set_size(width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
+        self.window.center_window()
+
         self.elapsed_time = 0.0
         self.world = world
         self.player = None
@@ -63,7 +65,7 @@ class MapWindow(arcade.Window):
             self.elapsed_time = 0.0
             if self.world.game_over:
                 exit()
-                #TODO: DO
+                # TODO: DO
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed"""
@@ -83,14 +85,16 @@ class MapWindow(arcade.Window):
         self.grid_sprite_list = arcade.SpriteList()
         for row in range(self.nb_row):
             for col in range(self.nb_col):
-                x = col * conf['grid']['cell_width']  + (conf['grid']['cell_width']  / 2) + conf['grid']['margin'] * (col-1)
-                y = row * conf['grid']['cell_height'] + (conf['grid']['cell_height'] / 2) + conf['grid']['margin'] * (row-1)
-                sprite = arcade.SpriteSolidColor(width=conf['grid']['cell_width'], height=conf['grid']['cell_width'], color=CellColor.EMPTY.value)
+                x = col * conf['grid']['cell_width'] + (conf['grid']['cell_width'] / 2) + conf['grid']['margin'] * (col - 1)
+                y = row * conf['grid']['cell_height'] + (conf['grid']['cell_height'] / 2) + conf['grid']['margin'] * (row - 1)
+                sprite = arcade.SpriteSolidColor(width=conf['grid']['cell_width'], height=conf['grid']['cell_width'],
+                                                 color=CellColor.EMPTY.value)
                 sprite.center_x = x
                 sprite.center_y = y
                 self.grid_sprite_list.append(sprite)
                 if self.debug_level >= 2:
-                    self.grid_coordinates.append( arcade.Text(f'{col}, {row}', x=x, y=y, color=(255, 0, 0, 255), font_size=8) )
+                    self.grid_coordinates.append(
+                        arcade.Text(f'{col}, {row}', x=x, y=y, color=(255, 0, 0, 255), font_size=8))
 
     def resync_grid_with_map(self) -> None:
         """Set the color of every Sprite/square of self.grid_sprite_list based on
@@ -99,9 +103,9 @@ class MapWindow(arcade.Window):
         for row in range(self.nb_row):
             for col in range(self.nb_col):
                 pos = row * self.nb_col + col
-                if self.map[(col,row)] == CellType.EMPTY:
+                if self.map[(col, row)] == CellType.EMPTY:
                     self.grid_sprite_list[pos].color = CellColor.EMPTY.value
-                elif self.map[(col,row)] == CellType.ORB:
+                elif self.map[(col, row)] == CellType.ORB:
                     self.grid_sprite_list[pos].color = CellColor.ORB.value
                 else:
                     self.grid_sprite_list[pos].color = CellColor.SNAKE.value
