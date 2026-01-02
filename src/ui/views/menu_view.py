@@ -27,13 +27,13 @@ class MenuView(arcade.gui.UIView):
         # Layouts are containers that automatically position widgets based on the layout rules
         self.layout = root.add( UIBoxLayout( space_between=20 ) )
 
-        self.layout.add(UILabel(text=conf['game_name']))
-        self.counter_bots = self.layout.add(Counter(text='Number of bots', min=0, max=30))
-        self.counter_orbs = self.layout.add(Counter(text='Number of orbs', min=1, max=150))
+        self.layout.add(UILabel(text=conf['game_name'], font_size=conf['views']['menu']['title_font_size']))
+        self.counter_bots = self.layout.add(Counter(text='Number of bots', min=1, max=30, value=3))
+        self.counter_orbs = self.layout.add(Counter(text='Number of orbs', min=1, max=150, value=10))
 
         self.radio_game_mode = self.layout.add(Radio(
             text='Game mode :',
-            options=['learn', 'I play'],
+            options=['learn', 'I play (no learning)', 'bots only (no learning)'],
             default='learn'
         ))
 
@@ -49,15 +49,19 @@ class MenuView(arcade.gui.UIView):
         self.ui_manager.disable()
 
     def on_draw(self):
+        self.clear()
         self.ui_manager.draw()
 
     def start_game(self, _event):
 
         world = World(nb_col=conf['grid']['nb_col'], nb_row=conf['grid']['nb_row'])
         world.create_orbs(quantity=self.counter_orbs.value)
+
+        first_is_a_player = self.radio_game_mode.current_value == 'I play (no learning)'
+        nb_snakes = self.counter_bots.value + 1 if first_is_a_player else self.counter_bots.value
         world.create_snakes(
-            quantity=self.counter_bots.value,
-            first_is_a_player=self.radio_game_mode.current_value == 'I play'
+            quantity=nb_snakes,
+            first_is_a_player=first_is_a_player
         )
         game_view = GameView(world=world)
         game_view.setup()

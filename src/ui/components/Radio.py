@@ -1,6 +1,8 @@
 import arcade
 from arcade.gui import UILabel, UIBoxLayout, UITextureButton
 
+from src.utils import conf
+
 
 class Radio(arcade.gui.UIBoxLayout):
 
@@ -8,14 +10,13 @@ class Radio(arcade.gui.UIBoxLayout):
 
         super().__init__(vertical=False, space_between=20)
 
-        self.with_border(color=arcade.color.WHITE)
         self.options = options
         self.current_value = default if default is not None else options[0]
 
         self.off_texture = arcade.make_circle_texture(diameter=25, color=arcade.color.WHITE)
         self.on_texture = arcade.make_circle_texture(diameter=25, color=arcade.color.GREEN)
 
-        self.add(UILabel(text=text))
+        self.add(UILabel(text=text, font_size=conf['views']['menu']['font_size']))
 
         self.ui_options = {}
         self.build_options()
@@ -37,14 +38,14 @@ class Radio(arcade.gui.UIBoxLayout):
             self.ui_options[option] = button
 
             container.add(button)
-            container.add(UILabel(text=option))
+            container.add(UILabel(text=option, font_size=conf['views']['menu']['font_size']))
             self.add(container)
 
     def on_radio_click(self, event):
         clicked_button = event.source
         selected_option = clicked_button.text_key
         self.current_value = selected_option
-        # Set current btn to off, all others to on
+        # Set current btn to on, all others to off
         for option_name, button in self.ui_options.items():
             if option_name == self.current_value:
                 button.texture = self.on_texture

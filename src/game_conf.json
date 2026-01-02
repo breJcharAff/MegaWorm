@@ -6,7 +6,9 @@
         "menu": {
             "width": 800,
             "height": 600,
-            "background_color": [0, 0, 0, 255]
+            "background_color": [0, 0, 0, 255],
+            "font_size": 16,
+            "title_font_size": 45
         }
     },
     "grid": {

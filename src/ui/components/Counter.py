@@ -1,6 +1,8 @@
 import arcade
 from arcade.gui import bind, Property
 
+from src.utils import conf
+
 
 class Counter(arcade.gui.UIBoxLayout):
 
@@ -13,12 +15,10 @@ class Counter(arcade.gui.UIBoxLayout):
         self.min = min
         self.max = max
         self.value = value
-        self.with_border(color=arcade.color.WHITE)
-        self.with_background(color=arcade.uicolor.GRAY_CONCRETE)
 
-        self.add(arcade.gui.UILabel(text=text))
+        self.add(arcade.gui.UILabel(text=text, font_size=conf['views']['menu']['font_size']))
         self.btn_minus = self.add(arcade.gui.UIFlatButton(text='-', width=35))
-        self.label = self.add(arcade.gui.UILabel(text=str(self.value)))
+        self.label = self.add(arcade.gui.UILabel(text=str(self.value), font_size=conf['views']['menu']['font_size']))
         self.btn_plus = self.add(arcade.gui.UIFlatButton(text='+', width=35))
 
         self.btn_plus.on_click = self.increase
