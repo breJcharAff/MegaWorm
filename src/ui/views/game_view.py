@@ -19,10 +19,14 @@ class CellColor(Enum):
     ORB = conf['orbs']['color']
     SNAKE = conf['snakes']['color']
 
+class GameMode(Enum):
+    LEARN = 'learn'
+    PLAY = 'play (no learning)'
+    BOTS = 'full bots (no learning)'
 
 class GameView(arcade.View):
 
-    def __init__(self, world: World, debug_level: int = 0):
+    def __init__(self, world: World, game_mode: GameMode, debug_level: int = 0):
 
         logger.debug(f'[{os.path.basename(__file__)}] - Initializing GameView')
         super().__init__()
@@ -31,7 +35,8 @@ class GameView(arcade.View):
 
         self.elapsed_time = 0.0
         self.world = world
-        self.player = None
+        self.game_mode = game_mode
+        self.main_snake_score_text = None
         self.nb_row = conf['grid']['nb_row']
         self.nb_col = conf['grid']['nb_col']
         self.map = None
@@ -46,6 +51,7 @@ class GameView(arcade.View):
         """Set up the game here. Call to restart the game."""
         self.create_grid_sprite_list()
         self.resync_grid_with_map()
+        self.main_snake_score_text = arcade.Text(f'Score: {self.world.get_main_snake().score}', x=7, y=7, color=(255, 0, 0, 255))
 
     def on_draw(self):
         """Render the screen."""
@@ -53,6 +59,7 @@ class GameView(arcade.View):
         self.clear()
         self.resync_grid_with_map()
         self.grid_sprite_list.draw()
+        self.main_snake_score_text.draw()
         if self.debug_level >= 2:
             for text in self.grid_coordinates:
                 text.draw()
@@ -62,6 +69,7 @@ class GameView(arcade.View):
         self.elapsed_time += delta_time
         if self.elapsed_time >= conf['refresh_time']:
             self.world.update()
+            self.main_snake_score_text.text = f'Score: {self.world.get_main_snake().score}'
             self.elapsed_time = 0.0
             if self.world.game_over:
                 exit()
@@ -70,15 +78,16 @@ class GameView(arcade.View):
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed"""
         logger.debug(f'Pressed {key}')
-        if key == arcade.key.UP or key == arcade.key.Z:
-            self.world.set_player_direction(Direction.UP)
-        elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.world.set_player_direction(Direction.DOWN)
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.world.set_player_direction(Direction.RIGHT)
-        elif key == arcade.key.LEFT or key == arcade.key.Q:
-            self.world.set_player_direction(Direction.LEFT)
-        elif key == arcade.key.ESCAPE:
+        if self.game_mode == GameMode.PLAY:
+            if key == arcade.key.UP or key == arcade.key.Z:
+                self.world.set_player_direction(Direction.UP)
+            elif key == arcade.key.DOWN or key == arcade.key.S:
+                self.world.set_player_direction(Direction.DOWN)
+            elif key == arcade.key.RIGHT or key == arcade.key.D:
+                self.world.set_player_direction(Direction.RIGHT)
+            elif key == arcade.key.LEFT or key == arcade.key.Q:
+                self.world.set_player_direction(Direction.LEFT)
+        if key == arcade.key.ESCAPE:
             from src.ui.views.menu_view import MenuView
             self.window.show_view(MenuView())
 

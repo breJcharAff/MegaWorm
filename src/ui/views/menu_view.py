@@ -8,7 +8,7 @@ from arcade.gui import UIAnchorLayout, UIBoxLayout, UIFlatButton, UILabel
 from src.ui.components.Radio import Radio
 from src.utils import conf
 from src.engine.World import World
-from src.ui.views.game_view import GameView
+from src.ui.views.game_view import GameView, GameMode
 from src.ui.components.Counter import Counter
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,8 @@ class MenuView(arcade.gui.UIView):
 
         self.radio_game_mode = self.layout.add(Radio(
             text='Game mode :',
-            options=['learn', 'I play (no learning)', 'bots only (no learning)'],
-            default='learn'
+            options=[GameMode.LEARN.value, GameMode.PLAY.value, GameMode.BOTS.value],
+            default=GameMode.LEARN.value
         ))
 
         self.start_button = self.layout.add(UIFlatButton(text='Start Game', width=200))
@@ -57,13 +57,13 @@ class MenuView(arcade.gui.UIView):
         world = World(nb_col=conf['grid']['nb_col'], nb_row=conf['grid']['nb_row'])
         world.create_orbs(quantity=self.counter_orbs.value)
 
-        first_is_a_player = self.radio_game_mode.current_value == 'I play (no learning)'
+        first_is_a_player = self.radio_game_mode.current_value == GameMode.PLAY.value
         nb_snakes = self.counter_bots.value + 1 if first_is_a_player else self.counter_bots.value
         world.create_snakes(
             quantity=nb_snakes,
             first_is_a_player=first_is_a_player
         )
-        game_view = GameView(world=world)
+        game_view = GameView(world=world, game_mode=GameMode(self.radio_game_mode.current_value))
         game_view.setup()
         self.window.show_view(game_view)
 

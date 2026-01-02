@@ -88,6 +88,7 @@ class World:
 
             if self.map[(x,y)] == CellType.ORB:
                 self.snakes[snake_id].move(grow=True)
+                self.snakes[snake_id].score += 1
                 self.create_orbs(quantity=1)
                 self.remove_orb_at_position(x=x, y=y)
                 logging.debug(f'Snake {snake_id} ate an orb')
@@ -184,6 +185,10 @@ class World:
         for snake_id, snake in self.snakes.items():
             if not snake.is_bot:
                 return snake
+
+    def get_main_snake(self) -> Snake:
+        """The first snake is the bot that learns (and which matters)."""
+        return next(iter(self.snakes.values()))
 
     def remove_orb_at_position(self, x: int, y: int) -> bool:
         for orb_id, orb in self.orbs.items():

@@ -23,6 +23,7 @@ class Snake:
         self.direction = None
         self.is_bot = True
         self.is_main_snake = False
+        self.score = length
         Snake.number_of_snakes += 1
 
     def set_snake_as_player(self) -> None:
@@ -105,4 +106,5 @@ class Snake:
                f'   - Position  = {self.positions}\n'
                f'   - Direction = {self.direction}\n'
                f'   - Speed     = {self.speed}\n'
-               f'   - Is bot    = {self.is_bot}')
+               f'   - Is bot    = {self.is_bot}\n'
+               f'   - Score     = {self.score}')
