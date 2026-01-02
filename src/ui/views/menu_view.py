@@ -3,14 +3,16 @@ import os
 
 import arcade
 import arcade.gui
+from arcade.gui import UIAnchorLayout, UIBoxLayout
 
+from src.utils import conf
 from src.engine.World import World
 from src.ui.views.game_view import GameView
-from src.utils import conf
+from src.ui.components.Counter import Counter
 
 logger = logging.getLogger(__name__)
 
-class MenuView(arcade.View):
+class MenuView(arcade.gui.UIView):
 
     def __init__(self):
 
@@ -18,10 +20,14 @@ class MenuView(arcade.View):
         super().__init__()
         # Arcade’s GUI module provides classes to interact with the user using buttons, labels etc...
         # Each view should have its own UIManager
+        # call the add() function of UIManager to add widget to the GUI
         self.ui_manager = arcade.gui.UIManager()
+        root = self.ui_manager.add( UIAnchorLayout() )
+        # Layouts are containers that automatically position widgets based on the layout rules
+        self.layout = root.add( UIBoxLayout( space_between=20 ) )
 
-        self.v_box = arcade.gui.UIBoxLayout()
-
+        self.layout.add(Counter(text='Number of bots', min=0, max=30))
+        self.layout.add(Counter(text='Number of orbs', min=1, max=150))
 
     def on_show_view(self) -> None:
 
@@ -31,10 +37,10 @@ class MenuView(arcade.View):
     def on_hide_view(self) -> None:
         self.ui_manager.disable()
 
-    def on_draw(self) -> bool | None:
+    def on_draw(self):
         self.ui_manager.draw()
 
-    def on_key_press(self, key: int, modifiers: int) -> bool | None:
+    def on_key_press(self, key: int, modifiers: int):
 
         # temporary (before implementing real menu and button "play")
         if key == arcade.key.ESCAPE:
