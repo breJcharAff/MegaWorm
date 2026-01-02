@@ -78,6 +78,9 @@ class GameView(arcade.View):
             self.world.set_player_direction(Direction.RIGHT)
         elif key == arcade.key.LEFT or key == arcade.key.Q:
             self.world.set_player_direction(Direction.LEFT)
+        elif key == arcade.key.ESCAPE:
+            from src.ui.views.menu_view import MenuView
+            self.window.show_view(MenuView())
 
     def create_grid_sprite_list(self) -> None:
         """Creates the grid representing the map (similar to World.map)
