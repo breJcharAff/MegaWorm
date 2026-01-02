@@ -5,6 +5,7 @@ import arcade
 import arcade.gui
 from arcade.gui import UIAnchorLayout, UIBoxLayout
 
+from src.ui.components.Radio import Radio
 from src.utils import conf
 from src.engine.World import World
 from src.ui.views.game_view import GameView
@@ -28,6 +29,12 @@ class MenuView(arcade.gui.UIView):
 
         self.layout.add(Counter(text='Number of bots', min=0, max=30))
         self.layout.add(Counter(text='Number of orbs', min=1, max=150))
+
+        self.layout.add(Radio(
+            text='Game mode :',
+            options=['learn', 'I play'],
+            default='learn'
+        ))
 
     def on_show_view(self) -> None:
 
