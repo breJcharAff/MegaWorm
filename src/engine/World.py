@@ -98,8 +98,9 @@ class World:
     def update(self) -> None:
         """Called every ticks"""
 
-        self.set_direction_bots(game_mode=self.game_mode)
         self.update_map_state()
+
+        self.set_direction_bots(game_mode=self.game_mode)
 
         reward_main_snake = None
         is_main_snake_alive = True
@@ -120,8 +121,6 @@ class World:
             elif self.map[(x,y)] == CellType.ORB:
                 reward = Reward.ORB
                 self.snakes[snake_id].move(grow=True)
-                self.create_orbs(quantity=1, change_settings=False)
-                self.remove_orb_at_position(x=x, y=y)
                 logging.debug(f'Snake {snake_id} ate an orb')
 
             else:
@@ -139,6 +138,7 @@ class World:
         if not is_main_snake_alive:
             self.handle_game_over()
         self.kill_snakes()
+        self.kill_orbs()
         self.update_map_state()
 
     # ----------------- MAP ----------------- #
@@ -298,7 +298,7 @@ class World:
         for each 4 directions: the number of empty cells to the nearest...
         (
             top, right, bottom, left -> ... orb (=goal)
-            top, right, bottom, left -> ... collision (wall or snake)
+            top, right, bottom, left -> ... collision (wall or snake or exit map)
         )
         LIMITED TO 'Snake.radar_nb_cells' CELLS (too many possibilities otherwise)
         if no orbs or collision within 'Snake.radar_nb_cells' cells in the given
@@ -306,31 +306,60 @@ class World:
         """
         snake = self.snakes[snake_id]
         position_head = snake.positions[-1]['x'], snake.positions[-1]['y']
-        state = {
-            'orb':       { Direction.UP: 0, Direction.RIGHT: 0, Direction.DOWN: 0, Direction.LEFT: 0 },
+
+        state = { # Possible values = {-1, 0, 1, 2, 3} (where -1 = the snake is on the same cell as the orb and 3 = didn't find any orb in this direction)
+            'orb':       { Direction.UP: -1, Direction.RIGHT: -1, Direction.DOWN: -1, Direction.LEFT: -1 },
             'collision': { Direction.UP: 0, Direction.RIGHT: 0, Direction.DOWN: 0, Direction.LEFT: 0 }
+        } # for 'collision' the minimum is 0 since the snake has not / cannot move inside a 'collision' square
+        final_state = {
+            'orb':       { Direction.UP: None, Direction.RIGHT: None, Direction.DOWN: None, Direction.LEFT: None },
+            'collision': { Direction.UP: None, Direction.RIGHT: None, Direction.DOWN: None, Direction.LEFT: None }
         }
 
-        for nb_move in range(1, snake.radar_nb_cells+1):
+        for nb_move in range(0, snake.radar_nb_cells+1): #+1 since we first check the current position (no move)
+
             for direction in list(Direction):
+
                 x, y = get_new_position(initial_position=position_head, direction=direction, nb_of_moves=nb_move)
-                found_orb = state['orb'][direction] + 1 < nb_move
-                found_collision = state['collision'][direction] + 1 < nb_move
+                found_orb       = final_state['orb'][direction] is not None
+                found_collision = final_state['collision'][direction] is not None
+
                 if self.is_inside_map(x=x, y=y):
                     if self.map[(x,y)] in (CellType.EMPTY, CellType.MAIN_SNAKE):
-                        state['orb'][direction] += 1 if not found_orb else 0
-                        state['collision'][direction] += 1 if not found_collision else 0
+                        state['orb'][direction] += 1
+                        state['collision'][direction] += 1
                     elif self.map[(x,y)] == CellType.ORB:
-                        state['collision'][direction] += 1 if not found_collision else 0
+                        if not found_orb:
+                            # The snake can be on the same cell as an orb!
+                            # in this case, it's a new state that is '-1'
+                            # with the associated high reward for orb,
+                            # it should incite snake to capture more / look more for this exacte state
+                            final_state['orb'][direction] = nb_move-1
+                        state['collision'][direction] += 1
                     elif self.map[(x,y)] == CellType.SNAKE:
-                        state['orb'][direction] += 1 if not found_orb else 0
+                        if not found_collision:
+                            # the snake will never go to a 'collision' square
+                            # so the snake has not physically moved to the collision square.
+                            # if reward = collision and current nb_move = 1 for direction (0 = impossible)
+                            # it will 'know' this direction is bad
+                            final_state['collision'][direction] = nb_move-1
+                        state['orb'][direction] += 1
                 else:
                     if not found_orb:
-                        state['orb'][direction] = snake.radar_nb_cells  # max
+                        final_state['orb'][direction] = snake.radar_nb_cells  # max (could not find orb outside map)
+                    if not found_collision:
+                        final_state['collision'][direction] = nb_move-1
+
+        # If no orb / collision found in the given direction, set the value to the max (radar range)
+        for nb_move in range(0, snake.radar_nb_cells):
+            for direction in list(Direction):
+                for to_check in ('collision', 'orb'):
+                    if final_state[to_check][direction] is None:
+                        final_state[to_check][direction] = snake.radar_nb_cells
 
         return (
-            state['orb'][Direction.UP],       state['orb'][Direction.RIGHT],       state['orb'][Direction.DOWN],       state['orb'][Direction.LEFT],
-            state['collision'][Direction.UP], state['collision'][Direction.RIGHT], state['collision'][Direction.DOWN], state['collision'][Direction.LEFT]
+            final_state['orb'][Direction.UP],       final_state['orb'][Direction.RIGHT],       final_state['orb'][Direction.DOWN],       final_state['orb'][Direction.LEFT],
+            final_state['collision'][Direction.UP], final_state['collision'][Direction.RIGHT], final_state['collision'][Direction.DOWN], final_state['collision'][Direction.LEFT]
         )
 
     def retrieve_history(self):
@@ -358,6 +387,13 @@ class World:
             if not snake.is_alive:
                 self.transform_snake_into_orb(snake_id=snake_id)
         self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake.is_alive}
+
+    def kill_orbs(self):
+        """Remove 'dead' (eaten) orbs from the game and spawn one new"""
+        for orb_id, orb in self.orbs.items():
+            if not orb.is_alive:
+                self.create_orbs(quantity=1, change_settings=False)
+        self.orbs = {orb_id: orb for orb_id, orb in self.orbs.items() if orb.is_alive}
 
     def transform_snake_into_orb(self, snake_id: int):
         """Transform the snake body into orbs."""

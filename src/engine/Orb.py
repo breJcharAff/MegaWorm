@@ -6,6 +6,7 @@ class Orb:
         self.id = self.number_of_orbs+1
         self.x = None
         self.y = None
+        self.is_alive = True
         Orb.number_of_orbs += 1
 
     def set_position(self, x: int, y: int):

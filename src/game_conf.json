@@ -3,7 +3,7 @@
     "refresh_time": 0.00000001,
     "log_file": "megaworm.log",
     "AI": {
-        "version": 2,
+        "version": 3,
         "radar_nb_cells": 2,
         "learning_rate": 1,
         "discount_factor": 1
