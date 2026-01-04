@@ -30,7 +30,10 @@ class GameView(arcade.View):
         self.window.set_size(width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
         self.window.center_window()
 
-        self.refresh_time = conf['refresh_time']
+        if game_mode == GameMode.LEARN:
+            self.refresh_time = conf['refresh_time']
+        else:
+            self.refresh_time = 0.1
         self.elapsed_time = 0.0
         self.world = world
         self.game_mode = game_mode
@@ -71,14 +74,15 @@ class GameView(arcade.View):
             self.elapsed_time = 0.0
 
     def on_close(self) -> None:
-        self.world.save_q_table()
-        plt.plot(self.world.score_history)
-        plt.show()
+        if self.game_mode == GameMode.LEARN:
+            self.world.save_q_table()
+            plt.plot(self.world.score_history)
+            plt.show()
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed"""
 
-        if self.game_mode == GameMode.PLAY:
+        if self.game_mode == GameMode.PLAY and not self.world.game_over:
             if key == arcade.key.UP or key == arcade.key.Z:
                 self.world.set_direction_player(Direction.UP)
             elif key == arcade.key.DOWN or key == arcade.key.S:

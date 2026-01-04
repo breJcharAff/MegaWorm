@@ -213,7 +213,7 @@ class World:
                 if random.random() > snake.exploration and snake.state in snake.q_table:
                     self.set_direction_snake_best_from_q_table(snake_id=snake_id)
                 else:
-                    snake.exploration *= 99
+                    snake.exploration *= 0.99
                     self.set_direction_snake_random(snake_id=snake_id, can_collide=True)
             elif snake.is_bot:
                 self.set_direction_snake_random(snake_id=snake_id, can_collide=False)
@@ -493,7 +493,7 @@ class World:
     def get_ai_info_text(self) -> str:
         main_snake = self.get_main_snake()
         return (f'Loop: {main_snake.iteration} - Score: {main_snake.score} - '
-                f'Exploration: {main_snake.exploration} - QTable: {len(main_snake.q_table)}')
+                f'Exploration: {round(main_snake.exploration, 3)} - QTable: {len(main_snake.q_table)}')
 
 
 def get_empty_map(nb_col: int, nb_row: int) -> dict:

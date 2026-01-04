@@ -29,7 +29,7 @@ class Snake:
         self.iteration = 0
         self.score = length
         # AI
-        self.exploration = 0
+        self.exploration = conf['AI']['exploration']
         self.learning_rate = conf['AI']['learning_rate']
         self.discount_factor = conf['AI']['discount_factor']
         self.radar_nb_cells = conf['AI']['radar_nb_cells']

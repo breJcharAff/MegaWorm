@@ -90,7 +90,10 @@ class MenuView(arcade.gui.UIView):
             game_view.setup()
             self.window.show_view(game_view)
         else:
-            start_game_in_headless(world=world)
+            if game_mode_chosen == GameMode.LEARN:
+                start_game_in_headless(world=world)
+            else:
+                raise Exception('Headless mode not available if not in learn mode')
 
 def start_game_in_headless(world: World) -> None:
     try:

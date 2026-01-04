@@ -3,10 +3,11 @@
     "refresh_time": 0.00000001,
     "log_file": "megaworm.log",
     "AI": {
-        "version": 3,
+        "version": "25x25-radar=2_v4",
         "radar_nb_cells": 2,
-        "learning_rate": 1,
-        "discount_factor": 1
+        "learning_rate": 0.1,
+        "discount_factor": 0.9,
+        "exploration": 0.9
     },
     "views": {
         "menu": {
