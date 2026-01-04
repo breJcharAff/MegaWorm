@@ -1,9 +1,11 @@
 import logging
 import os
+import time
 
 import arcade
 import arcade.gui
 from arcade.gui import UIAnchorLayout, UIBoxLayout, UIFlatButton, UILabel
+import matplotlib.pyplot as plt
 
 from src.ui.components.Radio import Radio
 from src.utils import conf
@@ -42,6 +44,12 @@ class MenuView(arcade.gui.UIView):
             default='Yes'
         ))
 
+        self.radio_with_ui = self.layout.add(Radio(
+            text="Display game in Arcade Window?",
+            options=['Yes', 'No'],
+            default='Yes'
+        ))
+
         self.start_button = self.layout.add(UIFlatButton(text='Start Game', width=200))
         self.start_button.on_click = self.start_game
 
@@ -73,10 +81,33 @@ class MenuView(arcade.gui.UIView):
             quantity=nb_snakes,
             first_is_a_player=first_is_a_player
         )
-        game_view = GameView(
-            world=world,
-            game_mode=GameMode(self.radio_game_mode.current_value)
-        )
-        game_view.setup()
-        self.window.show_view(game_view)
+        show_ui = self.radio_with_ui.current_value=='Yes'
+        if show_ui:
+            game_view = GameView(
+                world=world,
+                game_mode=GameMode(self.radio_game_mode.current_value)
+            )
+            game_view.setup()
+            self.window.show_view(game_view)
+        else:
+            start_game_in_headless(world=world)
 
+def start_game_in_headless(world: World) -> None:
+    try:
+        print('Running game without UI... Press ctrl+C to save q_table + history and then exit.')
+        refresh_time = conf['refresh_time']
+        start = time.time()
+        while True:
+            time.sleep(refresh_time)
+            if not world.game_over:
+                world.update()
+                should_log = not world.game_over and time.time() - start >= 1
+                if should_log:
+                    logger.warning(world.get_ai_info_text())
+                    start = time.time()
+    except KeyboardInterrupt:
+        world.save_q_table()
+        plt.plot(world.score_history)
+        plt.show()
+    finally:
+        print('This window can be closed')

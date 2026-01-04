@@ -1,6 +1,5 @@
 import logging
 import os
-import time
 from enum import Enum
 
 import arcade
@@ -49,12 +48,7 @@ class GameView(arcade.View):
         """Set up the game here. Call to restart the game."""
         self.create_grid_sprite_list()
         self.resync_grid_with_map()
-        self.ai_info_text = arcade.Text(text=self.get_ai_info_text(), x=7, y=7, color=(255, 255, 255, 255))
-
-    def get_ai_info_text(self) -> str:
-        main_snake = self.world.get_main_snake()
-        return (f'Loop: {main_snake.iteration} - Score: {main_snake.score} - '
-                f'Exploration: {main_snake.exploration} - QTable: {len(main_snake.q_table)}')
+        self.ai_info_text = arcade.Text(text=self.world.get_ai_info_text(), x=7, y=7, color=(255, 255, 255, 255))
 
     def on_draw(self):
         """Render the screen."""
@@ -73,7 +67,7 @@ class GameView(arcade.View):
         if self.elapsed_time >= self.refresh_time and not self.world.game_over:
             self.world.update()
             if not self.world.game_over:
-                self.ai_info_text.text = self.get_ai_info_text()
+                self.ai_info_text.text = self.world.get_ai_info_text()
             self.elapsed_time = 0.0
 
     def on_close(self) -> None:

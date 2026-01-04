@@ -141,7 +141,7 @@ class World:
         self.kill_snakes()
         self.update_map_state()
 
-    # ----------------- MAP-RELATED METHODS ----------------- #
+    # ----------------- MAP ----------------- #
 
     def update_map_state(self) -> None:
         """Refresh the World.map dictionary to reflect latest state."""
@@ -192,7 +192,7 @@ class World:
         empty_cells = get_n_consecutive_empty_cells_from_grid(n=n, grid=self.map, nb_cols=self.nb_col, nb_rows=self.nb_row, empty_value=CellType.EMPTY)
         return random.choice(empty_cells)
 
-    # ----------------- DIRECTION-RELATED METHODS ----------------- #
+    # ----------------- DIRECTION ----------------- #
 
     def set_direction_snake(self, snake_id: int, direction: Direction) -> bool:
         if self.snakes[snake_id].can_change_direction(direction):
@@ -254,22 +254,23 @@ class World:
         #FIXME: set_snake_direction() can prevent the snake from changing direction (if not authorized)
         self.set_direction_snake(snake_id=snake_id, direction=Direction[action])
 
-    # ----------------- AI-RELATED METHODS ----------------- #
+    # ----------------- AI ----------------- #
 
     def save_q_table(self) -> None:
-        logger.info(f'--------- SAVING Q_TABLE ({len(self.last_q_table)}) + '
+        logger.warning(f'--------- SAVING Q_TABLE ({len(self.last_q_table)}) + '
                     f'SCORE HISTORY ({len(self.score_history)}) TO {FILE_AGENT} ---------')
         with open(FILE_AGENT, 'wb') as file:
             pickle.dump((self.last_q_table, self.score_history), file)
 
     def load_q_table(self) -> None:
         if os.path.exists(FILE_AGENT):
-            logger.info(f'--------- LOADING Q_TABLE + SCORE HISTORY FROM {FILE_AGENT} ---------')
             main_snake = self.get_main_snake()
             with open(FILE_AGENT, 'rb') as file:
                 main_snake.q_table, self.score_history = pickle.load(file)
+            logger.warning(f'--------- LOADING Q_TABLE ({len(main_snake.q_table)}) + '
+                           f'SCORE HISTORY ({len(self.score_history)}) FROM {FILE_AGENT} ---------')
         else:
-            logger.info(f'{FILE_AGENT} not found: no QTable and score history.')
+            logger.warning(f'{FILE_AGENT} not found: no QTable and score history.')
 
     def update_q_table(self, reward: Reward):
         """Updates the Snake q_table and state based on the direction/action it chose."""
@@ -341,7 +342,7 @@ class World:
 
         self.load_q_table()
 
-    # ----------------- GAME-OVER-RELATED METHODS ----------------- #
+    # ----------------- GAME-OVER ----------------- #
 
     def is_collision(self, x: int, y: int, snake_id: int) -> bool:
         """Checks if coordinates is a wall or another snake."""
@@ -366,7 +367,6 @@ class World:
     def handle_game_over(self):
         self.game_over = True
         main_snake = self.get_main_snake()
-        print(main_snake.snake_ai_str())
         self.score_history.append(main_snake.score)
         self.last_q_table |= main_snake.q_table
         if self.auto_retry:
@@ -453,6 +453,11 @@ class World:
         for orb in self.orbs.values():
             print(f'ID={orb.id} - x={orb.x}, y={orb.y}')
         self.show_map_in_console()
+
+    def get_ai_info_text(self) -> str:
+        main_snake = self.get_main_snake()
+        return (f'Loop: {main_snake.iteration} - Score: {main_snake.score} - '
+                f'Exploration: {main_snake.exploration} - QTable: {len(main_snake.q_table)}')
 
 
 def get_empty_map(nb_col: int, nb_row: int) -> dict:
