@@ -445,27 +445,35 @@ def get_n_consecutive_empty_cells_from_grid(n: int, grid: dict, nb_cols: int, nb
         return None
 
     consecutive = []
-    consecutive_on_x = [[] for _ in range(nb_cols)]
-    consecutive_on_y = []
 
-    def check_consecutive():
-        for x in range(0, len(consecutive_on_x)):
-            if len(consecutive_on_x[x]) >= n:
-                consecutive.append( consecutive_on_x[x][-n:] )
-        if len(consecutive_on_y) >= n:
-            consecutive.append( consecutive_on_y[-n:] )
+    # consecutive_col[x] -> vertical streak for column x
+    consecutive_col = [[] for _ in range(nb_cols)]
 
-    for y in range(0, nb_rows):
-        for x in range(0, nb_cols):
-            cell = grid[(x,y)]
+    for y in range(nb_rows):
+        # -> horizontal streak row y (current)
+        consecutive_row = []
+
+        for x in range(nb_cols):
+            cell = grid[(x, y)]
             is_empty = cell == empty_value
+
             if is_empty:
-                consecutive_on_x[x].append( {'x':x, 'y':y} )
-                consecutive_on_y.append( {'x':x, 'y':y} )
+                coord = {'x': x, 'y': y}
+                # ROW
+                consecutive_row.append(coord)
+                if len(consecutive_row) >= n:
+                    # -> last n elements = valid streak
+                    consecutive.append(consecutive_row[-n:])
+                # COL
+                consecutive_col[x].append(coord)
+                if len(consecutive_col[x]) >= n:
+                    # -> last n elements = valid streak
+                    consecutive.append(consecutive_col[x][-n:])
+
             else:
-                consecutive_on_x[x] = []
-                consecutive_on_y = []
-            check_consecutive()
+                # Not empty: reset streaks
+                consecutive_row = []
+                consecutive_col[x] = []
 
     no_duplicate = []
     for element in consecutive:

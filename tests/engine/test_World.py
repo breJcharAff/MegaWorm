@@ -8,11 +8,26 @@ from src.engine.Orb import Orb
 from src.engine.Snake import Snake, Direction
 from src.engine.World import get_n_consecutive_empty_cells_from_grid, get_empty_map, World, CellType, get_new_position
 
-@pytest.mark.parametrize('', [
-    ()
+@pytest.mark.parametrize('nb_col, nb_row, nb_snakes', [
+    (1, 3, 1),
+    (1, 9, 2),
+    (2, 13, 3),
+    (5, 5, 2),
+    (25, 25, 30),
 ])
-def test_create_snakes_():
-    pass
+def test_create_snakes_good_placement_on_repeat(nb_col: int, nb_row: int, nb_snakes: int):
+    """The snake should ALWAYS be placed in a straight line."""
+    for i in range(10):
+        world = World(nb_col=nb_col, nb_row=nb_row, game_mode=GameMode.BOTS, auto_retry=False)
+        world.create_snakes(quantity=nb_snakes)
+        for snake_id, snake in world.snakes.items():
+            x_positions = [position['x'] for position in snake.positions]
+            y_positions = [position['y'] for position in snake.positions]
+            faces_right = x_positions[0]+2 == x_positions[1]+1 == x_positions[2]
+            faces_left  = x_positions[0]   == x_positions[1]+1 == x_positions[2]+2
+            faces_down  = y_positions[0]   == y_positions[1]+1 == y_positions[2]+2
+            faces_up    = y_positions[0]+2 == y_positions[1]+1 == y_positions[2]
+            assert faces_up or faces_right or faces_down or faces_left
 
 def test_create_snakes(an_empty_world):
     an_empty_world.create_snakes(quantity=3)
