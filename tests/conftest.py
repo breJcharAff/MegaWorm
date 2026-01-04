@@ -2,6 +2,7 @@ import pytest
 import json
 
 from src.engine.World import World
+from src.ui.views.game_view import GameMode
 
 
 @pytest.fixture(scope='session')
@@ -11,7 +12,7 @@ def game_conf():
 
 @pytest.fixture()
 def an_empty_world(game_conf):
-    return World(nb_col=game_conf['grid']['nb_row'], nb_row=game_conf['grid']['nb_col'])
+    return World(nb_col=game_conf['grid']['nb_row'], nb_row=game_conf['grid']['nb_col'], game_mode=GameMode.BOTS, auto_retry=False)
 
 @pytest.fixture()
 def a_world_with_one_snake(an_empty_world):

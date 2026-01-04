@@ -1,7 +1,9 @@
 import logging
 import os.path
+import pickle
 import random
-from typing import List, Dict
+from collections import Counter
+from typing import List, Dict, Tuple
 from enum import Enum
 
 from src.utils import conf
@@ -10,66 +12,99 @@ from src.engine.Snake import Snake, Direction
 
 logger = logging.getLogger(__name__)
 
+FILE_AGENT = f'agent_v{conf['AI']['version']}.qtable'
+
+class GameMode(Enum):
+    LEARN = 'learn'
+    PLAY  = 'play (no learning)'
+    BOTS  = 'full bots (no learning)'
+
 class CellType(Enum):
-    EMPTY = 0
-    ORB = 1
-    SNAKE = 2
+    EMPTY      = 0
+    ORB        = 1
+    SNAKE      = 2
+    MAIN_SNAKE = 3 # player or main bot
+
+class Reward(Enum):
+    DEFAULT   = -1
+    COLLISION = -500
+    ORB       = 30
 
 class World:
 
-    def __init__(self, nb_col: int, nb_row: int):
+    def __init__(self, nb_col: int, nb_row: int, game_mode: GameMode, auto_retry: bool):
+
         logger.debug(f'[{os.path.basename(__file__)}] : Creating empty world and map.')
         self.nb_col = nb_col
         self.nb_row = nb_row
+        self.game_mode = game_mode
+        self.auto_retry = auto_retry
+        self.score_history = []
+        # saves the main snake q_table between tries (the snake is deleted when it dies)
+        self.last_q_table = {}
+        self.settings = {
+            'nb_snakes': 0,
+            'nb_orbs': 0
+        }
         self.map = get_empty_map(nb_col=nb_col, nb_row=nb_row)
         self.snakes: Dict[int, Snake] = {}
         self.orbs: Dict[int, Orb] = {}
         self.game_over = False
 
-    def create_snakes(self, quantity: int, first_is_a_player: bool = False) -> None:
+    def create_snakes(self, quantity: int, first_is_a_player: bool = False, change_settings: bool = True) -> None:
         """Creates and spawns snakes (ready to play)."""
-        for i in range(0, quantity):
+        logger.info(f'---------------- CREATING {quantity} SNAKES ----------------')
+        if change_settings:
+            self.settings['nb_snakes'] += quantity
+        for i in range(quantity):
             snake = Snake(length=conf['snakes']['length_initial'], speed=1)
             snake.positions = self.get_random_n_consecutive_empty_cells(snake.length)
-            if i==0 and first_is_a_player:
-                snake.set_snake_as_player()
             self.snakes[snake.id] = snake
-            self.set_snake_direction_random(snake_id=snake.id)
-            logger.info(f'[{os.path.basename(__file__)}] - NEW SNAKE : {snake.snake_str()}')
-        self.update_map_state()
+            self.update_map_state_with_snake_positions(snake_id=snake.id)
+            if i==0:
+                if first_is_a_player:
+                    snake.set_snake_as_player()
+                    self.set_direction_snake_random(snake_id=snake.id, can_collide=False)
+                else:
+                    snake.is_main_snake = True
+                    if self.game_mode == GameMode.LEARN:
+                        snake.state = self.get_state_snake(snake_id=snake.id)
+                        snake.q_table = self.last_q_table
+            logger.info(f'[{os.path.basename(__file__)}] - NEW SNAKE : {snake.snake_ai_str() if snake.is_main_snake else snake.snake_str()}')
+        self.set_direction_bots(game_mode=self.game_mode)
 
-    def create_orbs(self, quantity: int) -> None:
+        if change_settings and self.game_mode == GameMode.LEARN:
+            self.retrieve_history()
+
+    def create_orbs(self, quantity: int, change_settings: bool = True) -> None:
         """Creates and spawns orbs."""
+        logger.info(f'---------------- CREATING {quantity} ORBS ----------------')
+        if change_settings:
+            self.settings['nb_orbs'] += quantity
         empty_cells = self.get_map_empty_cells()
         if len(empty_cells) >= quantity:
             random_cells = random.sample(population=empty_cells, k=quantity)
-            for i in range(0, quantity):
+            for i in range(quantity):
                 self.create_orb(x=random_cells[i]['x'], y=random_cells[i]['y'])
-            self.update_map_state()
 
     def create_orb(self, x: int, y: int) -> None:
+        """Creates one orb at position (x,y)"""
         orb = Orb()
         orb.set_position(x=x, y=y)
         self.orbs[orb.id] = orb
+        self.update_map_state_with_orb_position(orb_id=orb.id)
         logger.debug(f'[{os.path.basename(__file__)}] - NEW ORB at x={orb.x}, y={orb.y}')
-
-    def update_map_state(self) -> None:
-        """Refresh the World.map dictionary to reflect latest state."""
-        self.map = get_empty_map(nb_col=self.nb_col, nb_row=self.nb_row)
-        for orb_id, orb in self.orbs.items():
-            self.map[(orb.x, orb.y)] = CellType.ORB
-        for snake_id, snake in self.snakes.items():
-            for cell in snake.positions:
-                x, y = cell['x'], cell['y']
-                self.map[(x,y)] = CellType.SNAKE
 
     def update(self) -> None:
         """Called every ticks"""
 
-        self.set_bots_direction()
+        self.set_direction_bots(game_mode=self.game_mode)
         self.update_map_state()
 
         dead_snake_ids = []
+
+        reward_main_snake = None
+        is_main_snake_alive = True
 
         for snake_id, snake in self.snakes.items():
 
@@ -79,35 +114,56 @@ class World:
 
             if self.is_collision(x=x, y=y, snake_id=snake_id):
                 logging.info(f'Snake {snake_id} collided and died.')
-                dead_snake_ids.append(snake_id)
+                reward = Reward.COLLISION
                 if snake.is_main_snake:
-                    self.game_over = True
-                    return
-                continue
+                    is_main_snake_alive = False
+                dead_snake_ids.append(snake_id)
 
-
-            if self.map[(x,y)] == CellType.ORB:
+            elif self.map[(x,y)] == CellType.ORB:
+                reward = Reward.ORB
                 self.snakes[snake_id].move(grow=True)
-                self.snakes[snake_id].score += 1
-                self.create_orbs(quantity=1)
+                self.create_orbs(quantity=1, change_settings=False)
                 self.remove_orb_at_position(x=x, y=y)
                 logging.debug(f'Snake {snake_id} ate an orb')
 
             else:
+                reward = Reward.DEFAULT
                 self.snakes[snake_id].move(grow=False)
 
-            self.map[(x, y)] = self.snakes[snake_id].id
+            self.snakes[snake_id].score += reward.value
+            self.snakes[snake_id].iteration += 1
+            if reward != Reward.COLLISION:
+                self.map[(x, y)] = self.snakes[snake_id].id
+            if snake.is_main_snake:
+                reward_main_snake = reward
 
+        self.update_q_table(reward=reward_main_snake)
+        if not is_main_snake_alive:
+            self.handle_game_over()
         self.kill_snakes(snake_ids=dead_snake_ids)
         self.update_map_state()
 
-    def get_state(self) -> dict:
-        self.update_map_state()
-        return {
-            'map': self.map,
-            'snakes': self.snakes,
-            'orbs': self.orbs
-        }
+    # ----------------- MAP-RELATED METHODS ----------------- #
+
+    def update_map_state(self) -> None:
+        """Refresh the World.map dictionary to reflect latest state."""
+        self.map = get_empty_map(nb_col=self.nb_col, nb_row=self.nb_row)
+        for orb_id, _orb in self.orbs.items():
+            self.update_map_state_with_orb_position(orb_id=orb_id)
+        for snake_id, _snake in self.snakes.items():
+            self.update_map_state_with_snake_positions(snake_id=snake_id)
+
+    def update_map_state_with_snake_positions(self, snake_id: int) -> None:
+        for cell in self.snakes[snake_id].positions:
+            x, y = cell['x'], cell['y']
+            if self.snakes[snake_id].is_main_snake:
+                self.map[(x, y)] = CellType.MAIN_SNAKE
+            else:
+                self.map[(x, y)] = CellType.SNAKE
+
+    def update_map_state_with_orb_position(self, orb_id: int) -> None:
+        x, y = self.orbs[orb_id].x, self.orbs[orb_id].y
+        self.map[(x, y)] = CellType.ORB
 
     def show_map_in_console(self) -> None:
         """used for debugging"""
@@ -132,45 +188,205 @@ class World:
         empty_cells = get_n_consecutive_empty_cells_from_grid(n=n, grid=self.map, nb_cols=self.nb_col, nb_rows=self.nb_row, empty_value=CellType.EMPTY)
         return random.choice(empty_cells)
 
-    def set_snake_direction(self, snake_id: int, direction: Direction) -> bool:
+    # ----------------- DIRECTION-RELATED METHODS ----------------- #
+
+    def set_direction_snake(self, snake_id: int, direction: Direction) -> bool:
         if self.snakes[snake_id].can_change_direction(direction):
             self.snakes[snake_id].set_direction(direction)
             return True
         return False
 
-    def set_player_direction(self, direction: Direction) -> bool:
+    def set_direction_player(self, direction: Direction) -> bool:
         """Called from Arcade (keyboard input), set the direction of the Snake that is a player"""
         player = self.get_snake_player()
-        return self.set_snake_direction(snake_id=player.id, direction=direction)
+        return self.set_direction_snake(snake_id=player.id, direction=direction)
 
-    def set_bots_direction(self) -> None:
-        """Set random new directions for all bots."""
+    def set_direction_bots(self, game_mode: GameMode) -> None:
+        """For all bots, set a new random direction that should not collide.
+        If the GameMode is LEARN, the main bot get a direction based on its q_table."""
         for snake_id, snake in self.snakes.items():
-            if snake.is_bot:
-                self.set_snake_direction_random(snake_id=snake_id)
+            if snake.is_main_snake and game_mode == GameMode.LEARN:
+                if random.random() > snake.exploration and snake.state in snake.q_table:
+                    self.set_direction_snake_best_from_q_table(snake_id=snake_id)
+                else:
+                    snake.exploration *= 99
+                    self.set_direction_snake_random(snake_id=snake_id, can_collide=True)
+            elif snake.is_bot:
+                self.set_direction_snake_random(snake_id=snake_id, can_collide=False)
 
-    def set_snake_direction_random(self, snake_id: int) -> None:
-        """Set a random new direction for the snake (that should not collide)."""
-        direction = self.get_random_direction_that_does_not_collide(snake_id=snake_id)
-        self.set_snake_direction(snake_id=snake_id, direction=direction)
+    def set_direction_snake_random(self, snake_id: int, can_collide: bool) -> None:
+        """Set a random new direction for the snake.
+        If can_collide is False, the snake will, if possible, not chose a direction that would collide."""
+        if can_collide:
+            direction = self.get_direction_authorized_random(snake_id=snake_id)
+        else:
+            direction = self.get_direction_authorized_random_that_does_not_collide(snake_id=snake_id)
+        self.set_direction_snake(snake_id=snake_id, direction=direction)
 
-    def get_random_direction_that_does_not_collide(self, snake_id: int) -> Direction:
-        """Get a random authorized direction that will not kill the snake (last one otherwise)."""
+    def get_direction_authorized_random(self, snake_id: int) -> Direction:
+        """Get one random authorized direction for the Snake"""
         authorized = self.snakes[snake_id].authorized_direction()
-        directions = random.sample(authorized, k=len(authorized))
+        return random.choice(authorized)
+
+    def get_directions_authorized_shuffled(self, snake_id: int) -> List[Direction]:
+        """Get all authorized direction for the Snake, shuffled."""
+        authorized = self.snakes[snake_id].authorized_direction()
+        return random.sample(authorized, k=len(authorized))
+
+    def get_direction_authorized_random_that_does_not_collide(self, snake_id: int) -> Direction:
+        """Get a random authorized direction that will not kill the snake (last one otherwise)."""
+        directions = self.get_directions_authorized_shuffled(snake_id=snake_id)
         for direction in directions:
             new_head = self.snakes[snake_id].next_position(direction=direction)
             if not self.is_collision(x=new_head['x'], y=new_head['y'], snake_id=snake_id):
                 return direction
         return directions[0]
 
+    def set_direction_snake_best_from_q_table(self, snake_id: int):
+        """Look up (in the q_table) the direction with the best reward and set it to the snake."""
+        snake = self.snakes[snake_id]
+        state = snake.q_table[snake.state]
+        action = max(state, key=state.get)
+        #FIXME: set_snake_direction() can prevent the snake from changing direction (if not authorized)
+        self.set_direction_snake(snake_id=snake_id, direction=Direction[action])
+
+    # ----------------- AI-RELATED METHODS ----------------- #
+
+    def save_q_table(self) -> None:
+        logger.info(f'--------- SAVING Q_TABLE ({len(self.last_q_table)}) + '
+                    f'SCORE HISTORY ({len(self.score_history)}) TO {FILE_AGENT} ---------')
+        with open(FILE_AGENT, 'wb') as file:
+            pickle.dump((self.last_q_table, self.score_history), file)
+
+    def load_q_table(self) -> None:
+        if os.path.exists(FILE_AGENT):
+            logger.info(f'--------- LOADING Q_TABLE + SCORE HISTORY FROM {FILE_AGENT} ---------')
+            main_snake = self.get_main_snake()
+            with open(FILE_AGENT, 'rb') as file:
+                main_snake.q_table, self.score_history = pickle.load(file)
+        else:
+            logger.info(f'{FILE_AGENT} not found: no QTable and score history.')
+
+    def update_q_table(self, reward: Reward):
+        """Updates the Snake q_table and state based on the direction/action it chose."""
+        main_snake = self.get_main_snake()
+        next_state = self.get_state_snake(snake_id=main_snake.id)
+        action_performed = main_snake.direction.name
+
+        if main_snake.state not in main_snake.q_table:
+            main_snake.q_table[main_snake.state] = {'UP': 0, 'RIGHT': 0, 'DOWN': 0, 'LEFT': 0}
+        if next_state not in main_snake.q_table:
+            main_snake.q_table[next_state] = {'UP': 0, 'RIGHT': 0, 'DOWN': 0, 'LEFT': 0}
+
+        # Q(s, a) += Q(s, a) + alpha * [r + gamma * max Q(s') - Q(s, a)]
+        delta = main_snake.learning_rate * (
+                reward.value
+                + main_snake.discount_factor
+                * max(main_snake.q_table[next_state].values()) - main_snake.q_table[main_snake.state][action_performed]
+        )
+        main_snake.q_table[main_snake.state][action_performed] += delta
+        main_snake.state = next_state
+
+    def get_state_snake(self, snake_id):
+        """
+        Calculate a representation of the environment (what the bot sees)
+        for each 4 directions: the number of empty cells to the nearest...
+        (
+            top, right, bottom, left -> ... orb (=goal)
+            top, right, bottom, left -> ... collision (wall or snake)
+        )
+        LIMITED TO 'Snake.radar_nb_cells' CELLS (too many possibilities otherwise)
+        if no orbs or collision within 'Snake.radar_nb_cells' cells in the given
+        direction, value is set to 'Snake.radar_nb_cells' (the max).
+        """
+        snake = self.snakes[snake_id]
+        position_head = snake.positions[-1]['x'], snake.positions[-1]['y']
+        state = {
+            'orb':       { Direction.UP: 0, Direction.RIGHT: 0, Direction.DOWN: 0, Direction.LEFT: 0 },
+            'collision': { Direction.UP: 0, Direction.RIGHT: 0, Direction.DOWN: 0, Direction.LEFT: 0 }
+        }
+
+        for nb_move in range(1, snake.radar_nb_cells+1):
+            for direction in list(Direction):
+                x, y = get_new_position(initial_position=position_head, direction=direction, nb_of_moves=nb_move)
+                found_orb = state['orb'][direction] + 1 < nb_move
+                found_collision = state['collision'][direction] + 1 < nb_move
+                if self.is_inside_map(x=x, y=y):
+                    if self.map[(x,y)] in (CellType.EMPTY, CellType.MAIN_SNAKE):
+                        state['orb'][direction] += 1 if not found_orb else 0
+                        state['collision'][direction] += 1 if not found_collision else 0
+                    elif self.map[(x,y)] == CellType.ORB:
+                        state['collision'][direction] += 1 if not found_collision else 0
+                    elif self.map[(x,y)] == CellType.SNAKE:
+                        state['orb'][direction] += 1 if not found_orb else 0
+                else:
+                    if not found_orb:
+                        state['orb'][direction] = snake.radar_nb_cells  # max
+
+        return (
+            state['orb'][Direction.UP],       state['orb'][Direction.RIGHT],       state['orb'][Direction.DOWN],       state['orb'][Direction.LEFT],
+            state['collision'][Direction.UP], state['collision'][Direction.RIGHT], state['collision'][Direction.DOWN], state['collision'][Direction.LEFT]
+        )
+
+    def retrieve_history(self):
+        main_snake = self.get_main_snake()
+        if main_snake is None:
+            raise Exception('Main snake should be created first')
+        if main_snake.q_table:
+            raise Exception('retrieve_history() would erase the existing (in memory) snake history.')
+
+        self.load_q_table()
+
+    # ----------------- GAME-OVER-RELATED METHODS ----------------- #
+
     def is_collision(self, x: int, y: int, snake_id: int) -> bool:
         """Checks if coordinates is a wall or another snake."""
         if not self.is_inside_map(x=x, y=y):
             return True
-        if self.map[(x,y)] == CellType.SNAKE and self.get_snake_at_position(x=x, y=y).id != snake_id:
+        if self.map[(x,y)] in (CellType.SNAKE, CellType.MAIN_SNAKE) and self.get_snake_at_position(x=x, y=y).id != snake_id:
             return True
         return False
+
+    def kill_snakes(self, snake_ids: List[int]):
+        """Transform the body of all dead snakes into orbs and remove them from the game."""
+        for snake_id, snake in self.snakes.items():
+            if snake_id in snake_ids:
+                self.transform_snake_into_orb(snake_id=snake_id)
+        self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake_id not in snake_ids}
+
+    def transform_snake_into_orb(self, snake_id: int):
+        """Transform the snake body into orbs."""
+        for cell in self.snakes[snake_id].positions:
+            self.create_orb(x=cell['x'], y=cell['y'])
+
+    def handle_game_over(self):
+        self.game_over = True
+        main_snake = self.get_main_snake()
+        print(main_snake.snake_ai_str())
+        self.score_history.append(main_snake.score)
+        self.last_q_table |= main_snake.q_table
+        if self.auto_retry:
+            self.reset_world()
+
+    def reset_world(self) -> None:
+        """Put the World in the same state as it was when instantiating it."""
+        logger.info('---------------- RESETTING WORLD ----------------')
+        self.map = get_empty_map(nb_col=self.nb_col, nb_row=self.nb_row)
+        self.snakes: Dict[int, Snake] = {}
+        self.orbs: Dict[int, Orb] = {}
+        self.game_over = False
+
+        self.create_orbs(
+            quantity=self.settings['nb_orbs'],
+            change_settings=False
+        )
+        self.create_snakes(
+            quantity=self.settings['nb_snakes'],
+            first_is_a_player=self.game_mode==GameMode.PLAY,
+            change_settings=False
+        )
+
+    # ----------------- OTHERS ----------------- #
 
     def get_snake_at_position(self, x: int, y: int) -> Snake | None:
         for snake_id, snake in self.snakes.items():
@@ -186,9 +402,11 @@ class World:
             if not snake.is_bot:
                 return snake
 
-    def get_main_snake(self) -> Snake:
-        """The first snake is the bot that learns (and which matters)."""
-        return next(iter(self.snakes.values()))
+    def get_main_snake(self) -> Snake | None:
+        """The main snake is the bot that learns (and which matters)."""
+        for snake in self.snakes.values():
+            if snake.is_main_snake:
+                return snake
 
     def remove_orb_at_position(self, x: int, y: int) -> bool:
         for orb_id, orb in self.orbs.items():
@@ -197,17 +415,21 @@ class World:
                 return True
         return False
 
-    def kill_snakes(self, snake_ids: List[int]):
-        """Transform the body of all dead snakes into orbs and remove them from the game."""
-        for snake_id, snake in self.snakes.items():
-            if snake_id in snake_ids:
-                self.transform_snake_into_orb(snake_id=snake_id)
-        self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake_id not in snake_ids}
+    def get_state(self) -> dict:
+        self.update_map_state()
+        return {
+            'map': self.map,
+            'snakes': self.snakes,
+            'orbs': self.orbs
+        }
 
-    def transform_snake_into_orb(self, snake_id: int):
-        """Transform the snake body into orbs."""
-        for cell in self.snakes[snake_id].positions:
-            self.create_orb(x=cell['x'], y=cell['y'])
+
+def get_empty_map(nb_col: int, nb_row: int) -> dict:
+    map = {}
+    for row in range(0, nb_row):
+        for col in range(0, nb_col):
+            map[(col, row)] = CellType.EMPTY
+    return map
 
 def get_n_consecutive_empty_cells_from_grid(n: int, grid: dict, nb_cols: int, nb_rows: int, empty_value: CellType) -> List[List[dict]] | None:
     """get a 3-dimensional list where the 2nd degree lists represent every possible 'n' cells that are both aligned (vertic. & horiz.) AND empty
@@ -252,10 +474,10 @@ def get_n_consecutive_empty_cells_from_grid(n: int, grid: dict, nb_cols: int, nb
 
     return no_duplicate
 
-def get_empty_map(nb_col: int, nb_row: int) -> dict:
-    map = {}
-    for row in range(0, nb_row):
-        for col in range(0, nb_col):
-            map[(col, row)] = CellType.EMPTY
-    return map
-
+def get_new_position(initial_position: Tuple[int, int], direction: Direction, nb_of_moves: int) -> Tuple[int, int]:
+    if nb_of_moves < 1:
+        return initial_position
+    target_position = Counter({'x': initial_position[0], 'y': initial_position[1]})
+    for i in range(nb_of_moves):
+        target_position.update(direction.value)
+    return target_position['x'], target_position['y']

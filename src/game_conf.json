@@ -2,6 +2,12 @@
     "game_name": "Megaworm",
     "refresh_time": 0.1,
     "log_file": "megaworm.log",
+    "AI": {
+        "version": 1,
+        "radar_nb_cells": 3,
+        "learning_rate": 1,
+        "discount_factor": 1
+    },
     "views": {
         "menu": {
             "width": 800,
@@ -24,7 +30,10 @@
     "snakes": {
         "scaling": 0.24,
         "length_initial": 3,
-        "color": [0, 255, 0, 255]
+        "color": [0, 255, 0, 255],
+        "main": {
+            "color": [0, 0, 255, 255]
+        }
     },
     "orbs": {
         "scaling": 0.06,

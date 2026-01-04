@@ -1,11 +1,13 @@
 import logging
 import os
+import time
 from enum import Enum
 
 import arcade
+import matplotlib.pyplot as plt
 
 from src.engine.Snake import Direction
-from src.engine.World import World, CellType
+from src.engine.World import World, CellType, GameMode
 from src.utils import conf
 
 # Window size depends on grid dimension
@@ -18,40 +20,41 @@ class CellColor(Enum):
     EMPTY = conf['empty']['color']
     ORB = conf['orbs']['color']
     SNAKE = conf['snakes']['color']
-
-class GameMode(Enum):
-    LEARN = 'learn'
-    PLAY = 'play (no learning)'
-    BOTS = 'full bots (no learning)'
+    MAIN_SNAKE = conf['snakes']['main']['color']
 
 class GameView(arcade.View):
 
-    def __init__(self, world: World, game_mode: GameMode, debug_level: int = 0):
+    def __init__(self, world: World, game_mode: GameMode):
 
         logger.debug(f'[{os.path.basename(__file__)}] - Initializing GameView')
         super().__init__()
         self.window.set_size(width=WINDOW_WIDTH, height=WINDOW_HEIGHT)
         self.window.center_window()
 
+        self.refresh_time = conf['refresh_time']
         self.elapsed_time = 0.0
         self.world = world
         self.game_mode = game_mode
-        self.main_snake_score_text = None
         self.nb_row = conf['grid']['nb_row']
         self.nb_col = conf['grid']['nb_col']
         self.map = None
         self.grid_sprite_list = None
         self.orb_texture = None
+        self.ai_info_text = None
 
         # DEBUG
-        self.debug_level = debug_level
         self.grid_coordinates = []
 
     def setup(self):
         """Set up the game here. Call to restart the game."""
         self.create_grid_sprite_list()
         self.resync_grid_with_map()
-        self.main_snake_score_text = arcade.Text(f'Score: {self.world.get_main_snake().score}', x=7, y=7, color=(255, 0, 0, 255))
+        self.ai_info_text = arcade.Text(text=self.get_ai_info_text(), x=7, y=7, color=(255, 255, 255, 255))
+
+    def get_ai_info_text(self) -> str:
+        main_snake = self.world.get_main_snake()
+        return (f'Loop: {main_snake.iteration} - Score: {main_snake.score} - '
+                f'Exploration: {main_snake.exploration} - QTable: {len(main_snake.q_table)}')
 
     def on_draw(self):
         """Render the screen."""
@@ -59,37 +62,50 @@ class GameView(arcade.View):
         self.clear()
         self.resync_grid_with_map()
         self.grid_sprite_list.draw()
-        self.main_snake_score_text.draw()
-        if self.debug_level >= 2:
+        self.ai_info_text.draw()
+        if self.window.debug_level >= 2:
             for text in self.grid_coordinates:
                 text.draw()
 
     def on_update(self, delta_time):
         """Similar to on_draw(). Called 60 times per second (by default)."""
         self.elapsed_time += delta_time
-        if self.elapsed_time >= conf['refresh_time']:
+        if self.elapsed_time >= self.refresh_time and not self.world.game_over:
             self.world.update()
-            self.main_snake_score_text.text = f'Score: {self.world.get_main_snake().score}'
+            if not self.world.game_over:
+                self.ai_info_text.text = self.get_ai_info_text()
             self.elapsed_time = 0.0
-            if self.world.game_over:
-                exit()
-                # TODO: DO
+
+    def on_close(self) -> None:
+        self.world.save_q_table()
+        plt.plot(self.world.score_history)
+        plt.show()
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed"""
-        logger.debug(f'Pressed {key}')
+
         if self.game_mode == GameMode.PLAY:
             if key == arcade.key.UP or key == arcade.key.Z:
-                self.world.set_player_direction(Direction.UP)
+                self.world.set_direction_player(Direction.UP)
             elif key == arcade.key.DOWN or key == arcade.key.S:
-                self.world.set_player_direction(Direction.DOWN)
+                self.world.set_direction_player(Direction.DOWN)
             elif key == arcade.key.RIGHT or key == arcade.key.D:
-                self.world.set_player_direction(Direction.RIGHT)
+                self.world.set_direction_player(Direction.RIGHT)
             elif key == arcade.key.LEFT or key == arcade.key.Q:
-                self.world.set_player_direction(Direction.LEFT)
-        if key == arcade.key.ESCAPE:
-            from src.ui.views.menu_view import MenuView
-            self.window.show_view(MenuView())
+                self.world.set_direction_player(Direction.LEFT)
+
+        if self.game_mode == GameMode.LEARN:
+            if key == arcade.key.E:
+                self.world.get_main_snake().exploration += 0.05
+
+        if key == arcade.key.R:
+            self.world.reset_world()
+
+        elif key == arcade.key.NUM_ADD:
+            self.refresh_time *= 1.05
+        elif key == arcade.key.NUM_SUBTRACT:
+            self.refresh_time *= 0.95
+            logger.info(f'{self.refresh_time=}')
 
     def create_grid_sprite_list(self) -> None:
         """Creates the grid representing the map (similar to World.map)
@@ -104,7 +120,7 @@ class GameView(arcade.View):
                 sprite.center_x = x
                 sprite.center_y = y
                 self.grid_sprite_list.append(sprite)
-                if self.debug_level >= 2:
+                if self.window.debug_level >= 2:
                     self.grid_coordinates.append(
                         arcade.Text(f'{col}, {row}', x=x, y=y, color=(255, 0, 0, 255), font_size=8))
 
@@ -119,5 +135,7 @@ class GameView(arcade.View):
                     self.grid_sprite_list[pos].color = CellColor.EMPTY.value
                 elif self.map[(col, row)] == CellType.ORB:
                     self.grid_sprite_list[pos].color = CellColor.ORB.value
-                else:
+                elif self.map[(col, row)] == CellType.SNAKE:
                     self.grid_sprite_list[pos].color = CellColor.SNAKE.value
+                else:
+                    self.grid_sprite_list[pos].color = CellColor.MAIN_SNAKE.value

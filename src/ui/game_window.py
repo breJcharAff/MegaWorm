@@ -13,10 +13,10 @@ WINDOW_TITLE = conf['game_name']
 
 class GameWindow(arcade.Window):
 
-    def __init__(self, visible: bool = True):
+    def __init__(self, visible: bool = True, debug_level: int = 0):
 
         logger.debug(f'[{os.path.basename(__file__)}] - Initializing Arcade Window')
         super().__init__(width=WINDOW_WIDTH, height=WINDOW_HEIGHT, title=WINDOW_TITLE, center_window=True, visible=visible)
         # "activate" the MenuView
+        self.debug_level = debug_level
         self.show_view(MenuView())
-

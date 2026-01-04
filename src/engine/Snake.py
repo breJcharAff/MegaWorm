@@ -3,6 +3,8 @@ import logging
 from enum import Enum
 from typing import List
 
+from src.utils import conf
+
 logger = logging.getLogger(__name__)
 
 class Direction(Enum):
@@ -23,7 +25,15 @@ class Snake:
         self.direction = None
         self.is_bot = True
         self.is_main_snake = False
+        self.iteration = 0
         self.score = length
+        # AI
+        self.exploration = 0
+        self.learning_rate = conf['AI']['learning_rate']
+        self.discount_factor = conf['AI']['discount_factor']
+        self.radar_nb_cells = conf['AI']['radar_nb_cells']
+        self.state = None # current state (before moving)
+        self.q_table = {}
         Snake.number_of_snakes += 1
 
     def set_snake_as_player(self) -> None:
@@ -107,4 +117,17 @@ class Snake:
                f'   - Direction = {self.direction}\n'
                f'   - Speed     = {self.speed}\n'
                f'   - Is bot    = {self.is_bot}\n'
-               f'   - Score     = {self.score}')
+               f'   - Is main   = {self.is_main_snake}\n'
+               f'   - Iteration = {self.iteration}\n'
+               f'   - Score     = {self.score}\n')
+
+    def snake_ai_str(self) -> str:
+        """Used for debugging"""
+
+        return (self.snake_str()
+             + f'\n   - Exploration     = {self.exploration}\n'
+               f'   - Learning rate    = {self.learning_rate}\n'
+               f'   - Discount factor  = {self.discount_factor}\n'
+               f'   - Radar            = {self.radar_nb_cells}\n'
+               f'   - State            = {self.state}\n'
+               f'   - QTable (len={len(self.q_table.items())}), last 10 =  {dict(list(self.q_table.items())[:10])}\n')

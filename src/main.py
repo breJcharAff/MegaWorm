@@ -10,7 +10,7 @@ def main(debug_level: int) -> None:
 
     setup_logging(level=debug_level)
 
-    _window = GameWindow()
+    _window = GameWindow(debug_level=debug_level)
     arcade.run()
 
 if __name__ == '__main__':
