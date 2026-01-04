@@ -19,6 +19,7 @@ class Snake:
 
     def __init__(self, length: int, speed: int):
         self.id = self.number_of_snakes+1
+        self.is_alive = True
         self.length = length
         self.speed = speed
         self.positions = []
@@ -112,10 +113,11 @@ class Snake:
     def snake_str(self) -> str:
         """Used for debugging."""
         return (f'\n   - Id        = {self.id}\n'
-               f'   - Length    = {self.length}\n'
                f'   - Position  = {self.positions}\n'
                f'   - Direction = {self.direction}\n'
+               f'   - Length    = {self.length}\n'
                f'   - Speed     = {self.speed}\n'
+               f'   - Is Alive  = {self.is_alive}\n'
                f'   - Is bot    = {self.is_bot}\n'
                f'   - Is main   = {self.is_main_snake}\n'
                f'   - Iteration = {self.iteration}\n'

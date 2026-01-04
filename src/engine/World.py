@@ -37,6 +37,7 @@ class World:
         logger.debug(f'[{os.path.basename(__file__)}] : Creating empty world and map.')
         self.nb_col = nb_col
         self.nb_row = nb_row
+        self.game_over = False
         self.game_mode = game_mode
         self.auto_retry = auto_retry
         self.score_history = []
@@ -49,7 +50,6 @@ class World:
         self.map = get_empty_map(nb_col=nb_col, nb_row=nb_row)
         self.snakes: Dict[int, Snake] = {}
         self.orbs: Dict[int, Orb] = {}
-        self.game_over = False
 
     def create_snakes(self, quantity: int, first_is_a_player: bool = False, change_settings: bool = True) -> None:
         """Creates and spawns snakes (ready to play)."""
@@ -101,8 +101,6 @@ class World:
         self.set_direction_bots(game_mode=self.game_mode)
         self.update_map_state()
 
-        dead_snake_ids = []
-
         reward_main_snake = None
         is_main_snake_alive = True
 
@@ -115,9 +113,9 @@ class World:
             if self.is_collision(x=x, y=y, snake_id=snake_id):
                 logging.info(f'Snake {snake_id} collided and died.')
                 reward = Reward.COLLISION
+                snake.is_alive = False
                 if snake.is_main_snake:
                     is_main_snake_alive = False
-                dead_snake_ids.append(snake_id)
 
             elif self.map[(x,y)] == CellType.ORB:
                 reward = Reward.ORB
@@ -130,17 +128,17 @@ class World:
                 reward = Reward.DEFAULT
                 self.snakes[snake_id].move(grow=False)
 
+            self.update_map_state()
+
             self.snakes[snake_id].score += reward.value
             self.snakes[snake_id].iteration += 1
-            if reward != Reward.COLLISION:
-                self.map[(x, y)] = self.snakes[snake_id].id
             if snake.is_main_snake:
                 reward_main_snake = reward
 
         self.update_q_table(reward=reward_main_snake)
         if not is_main_snake_alive:
             self.handle_game_over()
-        self.kill_snakes(snake_ids=dead_snake_ids)
+        self.kill_snakes()
         self.update_map_state()
 
     # ----------------- MAP-RELATED METHODS ----------------- #
@@ -154,6 +152,8 @@ class World:
             self.update_map_state_with_snake_positions(snake_id=snake_id)
 
     def update_map_state_with_snake_positions(self, snake_id: int) -> None:
+        #FIXME: DOES NOT SET MAP CELL BACK TO EMPTY WHEN SNAKE MOVES (without eating)
+        #FIXME: EITHER USE update_map_state() instead or pass as a param the old cells occupied by the snake (before moving)
         for cell in self.snakes[snake_id].positions:
             x, y = cell['x'], cell['y']
             if self.snakes[snake_id].is_main_snake:
@@ -165,7 +165,7 @@ class World:
         x, y = self.orbs[orb_id].x, self.orbs[orb_id].y
         self.map[(x, y)] = CellType.ORB
 
-    def show_map_in_console(self) -> None:
+    def get_map_str(self) -> str:
         """used for debugging"""
         map_str = '   ' + ''.join(str(i)+'  ' if len(str(i))<2 else str(i)+' ' for i in range(0, self.nb_col)) + '\n'
         for y in range(0, self.nb_row):
@@ -173,7 +173,11 @@ class World:
             for x in range(0, self.nb_col):
                 map_str += str(self.map[(x,y)].value) + '  '
             map_str += '\n'
-        print(map_str)
+        return map_str
+
+    def show_map_in_console(self) -> None:
+        """used for debugging"""
+        print(self.get_map_str())
 
     def get_map_empty_cells(self) -> List[dict]:
         """Get all the map cells that are empty"""
@@ -347,12 +351,12 @@ class World:
             return True
         return False
 
-    def kill_snakes(self, snake_ids: List[int]):
+    def kill_snakes(self):
         """Transform the body of all dead snakes into orbs and remove them from the game."""
         for snake_id, snake in self.snakes.items():
-            if snake_id in snake_ids:
+            if not snake.is_alive:
                 self.transform_snake_into_orb(snake_id=snake_id)
-        self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake_id not in snake_ids}
+        self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake.is_alive}
 
     def transform_snake_into_orb(self, snake_id: int):
         """Transform the snake body into orbs."""
@@ -422,6 +426,33 @@ class World:
             'snakes': self.snakes,
             'orbs': self.orbs
         }
+
+    def get_snakes_str(self) -> str:
+        """For debugging"""
+        output = ''
+        for snake in self.snakes.values():
+            if snake.is_main_snake:
+                output += snake.snake_ai_str()
+            else:
+                output += snake.snake_str()
+        return output
+
+    def show_entire_world_in_console(self) -> None:
+        """For debugging"""
+        logger.info(f'\n\n\n----------------- ENTIRE WORLD STATE -----------------\n\n')
+        print(
+            f'Dimensions: {self.nb_col} x {self.nb_row}\n'
+            f'Game Mode : {self.game_mode}\n'
+            f'Auto retry: {self.auto_retry}\n'
+            f'Game Over : {self.game_over}\n'
+            f'Settings  : {self.settings}'
+        )
+        print(f'\n----------- SNAKES {len(self.snakes)} -----------\n')
+        print(self.get_snakes_str())
+        print(f'\n----------- ORBS   {len(self.orbs)} -----------\n')
+        for orb in self.orbs.values():
+            print(f'ID={orb.id} - x={orb.x}, y={orb.y}')
+        self.show_map_in_console()
 
 
 def get_empty_map(nb_col: int, nb_row: int) -> dict:
