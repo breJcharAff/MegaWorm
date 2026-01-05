@@ -104,6 +104,7 @@ class World:
 
         reward_main_snake = None
         is_main_snake_alive = True
+        dead_orbs = []
 
         for snake_id, snake in self.snakes.items():
 
@@ -121,6 +122,7 @@ class World:
             elif self.map[(x,y)] == CellType.ORB:
                 reward = Reward.ORB
                 self.snakes[snake_id].move(grow=True)
+                dead_orbs.append(self.get_orb_at_position(x=x, y=y).id)
                 logging.debug(f'Snake {snake_id} ate an orb')
 
             else:
@@ -138,7 +140,7 @@ class World:
         if not is_main_snake_alive:
             self.handle_game_over()
         self.kill_snakes()
-        self.kill_orbs()
+        self.kill_orbs(orb_ids=dead_orbs)
         self.update_map_state()
 
     # ----------------- MAP ----------------- #
@@ -388,12 +390,15 @@ class World:
                 self.transform_snake_into_orb(snake_id=snake_id)
         self.snakes = {snake_id: snake for snake_id, snake in self.snakes.items() if snake.is_alive}
 
-    def kill_orbs(self):
+    def kill_orbs(self, orb_ids: List[int]):
         """Remove 'dead' (eaten) orbs from the game and spawn one new"""
+        quantity = 0
         for orb_id, orb in self.orbs.items():
-            if not orb.is_alive:
-                self.create_orbs(quantity=1, change_settings=False)
+            if orb_id in orb_ids:
+                orb.is_alive = False
+                quantity +=1
         self.orbs = {orb_id: orb for orb_id, orb in self.orbs.items() if orb.is_alive}
+        self.create_orbs(quantity=quantity, change_settings=False)
 
     def transform_snake_into_orb(self, snake_id: int):
         """Transform the snake body into orbs."""
@@ -433,6 +438,11 @@ class World:
             for cell in snake.positions:
                 if cell['x'] == x and cell['y'] == y:
                     return snake
+
+    def get_orb_at_position(self, x: int, y: int) -> Orb | None:
+        for orb_id, orb in self.orbs.items():
+            if orb.x == x and orb.y == y:
+                return orb
 
     def is_inside_map(self, x: int, y: int) -> bool:
         return (0 <= x < self.nb_col) and (0 <= y < self.nb_row)

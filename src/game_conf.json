@@ -1,9 +1,9 @@
 {
     "game_name": "Megaworm",
-    "refresh_time": 0.00000001,
+    "refresh_time": 0.01,
     "log_file": "megaworm.log",
     "AI": {
-        "version": "25x25-radar=2_v4",
+        "version": "7x7-radar=2_v6",
         "radar_nb_cells": 2,
         "learning_rate": 0.1,
         "discount_factor": 0.9,
